@@ -41,34 +41,34 @@ CHIP ALU {
         ng;      // if (out < 0)  equals 1, else 0
 
     PARTS:
-    
-    Mux16(a=x, b=false, sel=zx, out=x1);        //zeroing if required
+
+    //zeroing x and y if required
+    Mux16(a=x, b=false, sel=zx, out=x1);            
     Mux16(a=y, b=false, sel=zy, out=y1);
-    
-    Not16(in=x1, out=nx1);      //negating if required
+
+    //negating x and y if required
+    Not16(in=x1, out=nx1);
     Not16(in=y1, out=ny1);
     Mux16(a=x1, b=nx1, sel=nx, out=x2);
     Mux16(a=y1, b=ny1, sel=ny, out=y2);
 
-    Add16(a=x2, b=y2, out=addxy);       //considering f value
+    //performing functions as specified by f value
+    Add16(a=x2, b=y2, out=addxy);
     And16(a=x2, b=y2, out=andxy);
     Mux16(a=andxy, b=addxy, sel=f, out=fin);
+
+    //negating out if required
     Not16(in=fin, out=notfin);
-    Mux16(a=fin, b=notfin, sel=no, out=out, out[0..7]=fout, out[8..15]=sout, out[15]=signout);
-    //splitting out into 2 in previous line  so we can use the previously made Or8Way
+    Mux16(a=fin, b=notfin, sel=no, out=out, out[0..7]=fout, out[8..15]=sout, out[15]=outsign);
+    //(split out in half so the previously designed Or8Way chip can be used to compute zr)
     
-    Or8Way(in=fout, out=zr1);       //computing zr value
+    //computing zr value
+    Or8Way(in=fout, out=zr1);
     Or8Way(in=sout, out=zr2);
     Or(a=zr1, b=zr2, out=notzr);
     Not(in=notzr, out=zr);
 
-    And(a=signout, b=true, out=ng);
-
-
-
-
-
-
-
+    //computing ng value
+    And(a=outsign, b=true, out=ng);
 
 }

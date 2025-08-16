@@ -1,0 +1,85 @@
+// This file is part of www.nand2tetris.org
+// and the book "The Elements of Computing Systems"
+// by Nisan and Schocken, MIT Press.
+// File name: projects/5/CPU.hdl
+/**
+ * The Hack Central Processing unit (CPU).
+ * Parses the binary code in the instruction input and executes it according to the
+ * Hack machine language specification. In the case of a C-instruction, computes the
+ * function specified by the instruction. If the instruction specifies to read a memory
+ * value, the inM input is expected to contain this value. If the instruction specifies
+ * to write a value to the memory, sets the outM output to this value, sets the addressM
+ * output to the target address, and asserts the writeM output (when writeM = 0, any
+ * value may appear in outM).
+ * If the reset input is 0, computes the address of the next instruction and sets the
+ * pc output to that value. If the reset input is 1, sets pc to 0.
+ * Note: The outM and writeM outputs are combinational: they are affected by the
+ * instruction's execution during the current cycle. The addressM and pc outputs are
+ * clocked: although they are affected by the instruction's execution, they commit to
+ * their new values only in the next cycle.
+ */
+CHIP CPU {
+
+    IN  inM[16],         // M value input  (M = contents of RAM[A])
+        instruction[16], // Instruction for execution
+        reset;           // Signals whether to re-start the current
+                         // program (reset==1) or continue executing
+                         // the current program (reset==0).
+
+    OUT outM[16],        // M value output
+        writeM,          // Write to M? 
+        addressM[15],    // Address in data memory (of M)
+        pc[15];          // address of next instruction
+
+    PARTS:
+
+    //Note: in the comments, the name of the input "instruction" will be shortened to i
+    //and the chip "program counter" to PC
+
+    //Controlling contents of A register
+    //  When the op code (i.e. i[15]) is 0, i is an address that needs to be saved in the A register
+    //  Hence when i[15]=0, input should be i and load should be 1
+    //  When the op code is 1, the input should be the ALU output (i.e. outM)
+    //  load bit in this case is determined by i[5]
+	Mux16(a=instruction, b=outMcopy, sel=instruction[15], out=intoA);
+    Mux(a=true, b=instruction[5], sel=instruction[15], out=loadtoA);
+    ARegister(in=intoA, load=loadtoA, out[0..14]=addressM, out=addressMcopy);
+
+    //Controlling contents of D register
+    //  If op code is 0 nothing should be done here, i.e. load is 0
+    //  If op code is 1 then load bit is determined by i[4]
+    //  Input in both cases is output of ALU (i.e. outM)
+    Mux(a=false, b=instruction[4], sel=instruction[15], out=loadtoD);
+    DRegister(in=outMcopy, load=loadtoD, out=DtoALU);
+
+    //Giving inputs to the ALU
+    //  D is always sent to the ALU
+    //  i[12] is what decides whether to send A or M as the other input (0=A, 1=M)
+    //  i[6..11] are the control bits given to the ALU
+    Mux16(a=addressMcopy, b=inM, sel=instruction[12], out=AorMtoALU);
+    ALU(x=DtoALU, y=AorMtoALU, zx=instruction[11], nx=instruction[10], zy=instruction[9], ny=instruction[8], f=instruction[7], no=instruction[6], out=outMcopy, out=outM, zr=zr, ng=ng);
+
+    //Deciding whether PC should jump to a new address  (i.e. load address in A register into PC)
+    //  If zr or ng is true then number is not positive i.e. pos=0
+    //  i[0..2] are the jump condition bits in i
+    //      Run an And operation of i[0] with pos, i[1] with zr, and i[2] with ng
+    //      If any of these is 1, the jump condition is satisfied, so output 1 as jumpforop1
+    Or(a=zr, b=ng, out=notpos);
+    Not(in=notpos, out=pos);
+    And(a=instruction[0], b=pos, out=jumpbcpos);
+    And(a=instruction[1], b=zr, out=jumpbczr);
+    And(a=instruction[2], b=ng, out=jumpbcng);
+    Or8Way(in[0..4]=false, in[5]=jumpbcpos, in[6]=jumpbczr, in[7]=jumpbcng, out=jumpforop1);
+
+    //Program counter (PC)
+    //  Jumping should only occur if the op code is 1
+    Mux(a=false, b=jumpforop1, sel=instruction[15], out=jump);
+    PC(in=addressMcopy, load=jump, inc=true, reset=reset, out[0..14]=pc);
+
+    //Outputting writeM
+    //  If op code is 0, writeM is always 0 (only A register gets written into when op=0)
+    //  If op code is 1, writeM is directly i[3]
+    Or(a=false, b=instruction[3], out=writeMforop1);
+    Mux(a=false, b=writeMforop1, sel=instruction[15], out=writeM);
+
+}

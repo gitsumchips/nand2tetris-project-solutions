@@ -20,10 +20,8 @@ CHIP Computer {
     PARTS:
 
     //Inputs and outputs are connected exactly as specified by the Hack architecture
-    //Note to self: If you find a way to push the images into the git folder as well 
-    //  then change the names of the outputs to match exactly with the diagram
 
-    CPU(inM=inM, instruction=ROM32Kout, reset=reset, outM=outM, writeM=writeM, addressM=addressM, pc=pcout);
-    ROM32K(address=pcout, out=ROM32Kout);
+    CPU(inM=inM, instruction=instruction, reset=reset, outM=outM, writeM=writeM, addressM=addressM, pc=pc);
+    ROM32K(address=pc, out=instruction);
     Memory(in=outM, load=writeM, address=addressM, out=inM);
 }
